@@ -2,111 +2,134 @@ import streamlit as st
 import re
 from openai import OpenAI
 
-st.set_page_config(page_title="Smart Math Reasoning Tutor", layout="centered")
 
-client = OpenAI(
-    api_key="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" 
+st.set_page_config(
+    page_title="Smart Math Mistake Analyzer",
+    page_icon="🧠",
+    layout="centered"
 )
 
-st.title("Smart Math Reasoning Tutor")
-st.write(
-    "This app analyzes a student's math solution, detects logical mistakes, "
-    "and explains the correct reasoning step-by-step."
+client = OpenAI(
+    api_key="YOUR_API_KEY_HERE"  # <-- PUT YOUR API KEY HERE
+)
+
+
+st.markdown(
+    """
+    <h1 style='text-align:center;'> Smart Math Mistake Analyzer</h1>
+    <p style='text-align:center; color: gray;'>
+    An educational tool that analyzes student thinking — not just answers.
+    </p>
+    """,
+    unsafe_allow_html=True
 )
 
 st.divider()
+
+st.subheader(" Problem")
 question = st.text_input(
-    "Enter the math question"
+    "Enter a percentage-based math question",
     placeholder="Example: Find 20% of 150"
 )
 
+st.subheader(" Student Solution")
 student_solution = st.text_area(
-    " Enter the student's solution",
+    "Enter the student's working / steps",
     placeholder="Example: 20% × 150 = 20 × 150 = 3000"
 )
 
-analyze_btn = st.button(" Analyze Solution")
-
-def detect_percentage_mistake(question, solution):
-    """
-    Rule-based logic to detect common percentage mistakes
-    """
-    solution_clean = solution.lower()
-
-    # Case 1: Percentage not converted to fraction
-    if "%" in solution_clean and re.search(r"\b\d+\s*[×x*]\s*\d+", solution_clean):
-        return "Percentage not converted to fraction"
-
-    # Case 2: Wrong base value assumption
-    if "of" in question.lower() and "%" in question.lower():
-        if "/" not in solution_clean and "100" not in solution_clean:
-            return "Incorrect base value used for percentage"
-
-    # Case 3: Looks correct but calculation error
-    if "%" in solution_clean and ("0." in solution_clean or "/100" in solution_clean):
-        return "Calculation error after correct setup"
-
-    return "Unclear or mixed reasoning error"
+analyze = st.button("Analyze Thinking")
 
 
-def get_ai_explanation(mistake_type, question, student_solution):
+def analyze_percentage_logic(question, solution):
+    solution = solution.lower()
+
+    if "%" in solution and re.search(r"\b\d+\s*[x×*]\s*\d+", solution):
+        return {
+            "mistake": "Percentage not converted to fraction",
+            "confidence": "High"
+        }
+
+    if "%" in question.lower() and "of" in question.lower():
+        if "100" not in solution and "0." not in solution:
+            return {
+                "mistake": "Incorrect understanding of percentage base value",
+                "confidence": "Medium"
+            }
+
+    if "0." in solution or "/100" in solution:
+        return {
+            "mistake": "Calculation mistake after correct setup",
+            "confidence": "Medium"
+        }
+
+    return {
+        "mistake": "Unclear or mixed reasoning error",
+        "confidence": "Low"
+    }
+
+
+def get_ai_feedback(mistake, question, student_solution):
     prompt = f"""
-A student is solving a math percentage problem.
+You are a calm and supportive math tutor.
 
-Question:
+A student attempted this question:
 {question}
 
-Student's solution:
+Their solution:
 {student_solution}
 
-Detected mistake type:
-{mistake_type}
+Detected issue:
+{mistake}
 
-Explain clearly:
-1. Where the student's reasoning went wrong
-2. Why it is incorrect
-3. The correct approach
-4. One short tip to avoid this mistake in the future
+Explain in a friendly and human way:
+- Where the reasoning went wrong
+- Why this happens
+- How to solve it correctly
+- One short learning tip
 
-Keep the explanation simple and educational.
+Keep it simple, encouraging, and educational.
 """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful math tutor."},
+            {"role": "system", "content": "You are a helpful math tutor for students."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3
+        temperature=0.4
     )
 
     return response.choices[0].message.content
 
-if analyze_btn:
+
+# ---------------- MAIN FLOW ----------------
+if analyze:
     if not question or not student_solution:
         st.warning("Please enter both the question and the student's solution.")
     else:
-        mistake_type = detect_percentage_mistake(question, student_solution)
+        result = analyze_percentage_logic(question, student_solution)
 
-        st.subheader(" Detected Issue")
-        st.error(mistake_type)
+        st.subheader(" Analysis Result")
+        st.error(f"**Detected Issue:** {result['mistake']}")
+        st.info(f"**Confidence Level:** {result['confidence']}")
 
-        with st.spinner("Thinking like a tutor..."):
-            explanation = get_ai_explanation(
-                mistake_type,
+        with st.spinner("Analyzing thinking like a tutor..."):
+            feedback = get_ai_feedback(
+                result["mistake"],
                 question,
                 student_solution
             )
 
-        st.subheader("📘 Explanation & Correct Reasoning")
-        st.write(explanation)
+        st.subheader("📖 Tutor Feedback")
+        st.write(feedback)
 
-        st.success("Analysis complete ")
-
+        st.success("Analysis complete. Learning > memorization ")
 
 st.divider()
 st.caption(
-    "Built for an education-focused hackathon. "
-    "Logic-driven analysis + AI-assisted explanations."
+    "Built as an education-focused hackathon project. "
+    "Combines logical error detection with AI-assisted explanations."
 )
+
 
